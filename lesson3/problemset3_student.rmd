@@ -1,0 +1,253 @@
+---
+title: "Problem Set 3"
+author: "Benjamin Söllner"
+date: "29. September 2015"
+output: html_document
+---
+
+# 1- Diamonds
+```{r}
+library(ggplot2)
+data(diamonds) # load data
+summary(diamonds) # summary of variables
+dim(diamonds) # dimensions (observations times variables)
+nrow(diamonds) # number of observations
+?diamonds # help
+```
+
+**How many observations are in the data set?**: 53940
+
+**How many variables are in the data set?**: 10
+
+**How many ordered factors are in the data set?**: 3
+
+**What represents the best colour?**: D
+
+# 2- Price Histogram
+
+```{r}
+qplot(diamonds$price)
+```
+
+# 3- Price Histogram Summary
+```{r}
+summary(diamonds$price)
+```
+
+The distribution is skewed to the left and long-tailed. The mean is at 3933, the median at 2401. Further stats:
+
+- Min: 326
+- 1st Qu.: 950
+- 3rd Qu.: 5324
+- Max: 18820
+
+# 4- Diamond Counts
+```{r}
+nrow(subset(diamonds, price<500))
+nrow(subset(diamonds, price<250))
+nrow(subset(diamonds, price>=15000))
+```
+
+**How many diamonds cost less than $500?**: 1729
+
+**How many diamonds cost less than $250?**: 0
+
+**How many diamonds cost $15,000 or more?**: 1656
+
+# 5- Cheaper Diamonds
+Exploring the median region:
+```{r}
+qplot(diamonds$price, binwidth = 100) +
+  scale_x_continuous(limits = c(1500, 3500),
+                     breaks = seq(1500, 3500, 100))
+```
+There are no diamonds that cost $1500.
+
+# 6- Price by Cut Histogram
+```{r}
+qplot(x=price, data=diamonds, binwidth = 500) +
+  facet_wrap(~cut,ncol=3)
+```
+Similar distributions.
+
+# 7- Price by Cut
+```{r}
+by(diamonds$price, diamonds$cut, summary, digits = max(getOption('digits')))
+```
+
+**Which cut has the highest priced diamond?:** Premium ($18823.00)
+
+**Which cut has the lowest priced diamond?:** Premium & Ideal ($326.00)
+
+**WHich cut has the lowest median price?:** Ideal ($1810.000)
+
+# 8- Scales and Multiple Histograms
+```{r}
+qplot(x=price, data=diamonds, binwidth = 500) +
+  facet_wrap(~cut,ncol=3,scales="free_y")
+```
+Shows the uniformity of distribution better by making the y-axis scale on demand.
+
+# 9- Price per Carat by Cut
+```{r}
+qplot(x=price/carat, data=diamonds, binwidth=200) +
+  facet_wrap(~cut,ncol=3,scales="free_y")
+qplot(x=log10(price/carat), data=diamonds) +
+  facet_wrap(~cut,ncol=3,scales="free_y")
+```
+First showing skewed, second normalized distribution (using log transformation).
+
+# 10- Price Box Plot
+```{r}
+qplot(y=price, x=cut, data=diamonds, geom='boxplot')
+qplot(y=price, x=clarity, data=diamonds, geom='boxplot')
+qplot(y=price, x=color, data=diamonds, geom='boxplot')
+by(diamonds$price, diamonds$cut, summary)
+by(diamonds$price, diamonds$clarity, summary)
+by(diamonds$price, diamonds$color, summary)
+```
+
+# 11- Interquartile Range - IQR
+```{r}
+quantile(subset(diamonds, color=="D")$price)
+quantile(subset(diamonds, color=="J")$price)
+IQR(subset(diamonds, color=="D")$price)
+IQR(subset(diamonds, color=="J")$price)
+```
+
+**Quartiles for color D**: first: $911.0, third: $4213.5
+
+**Quartiles for color J**: first: $1860.0, third: $7695.0
+
+**IQR for best color (J)**: $3302.5
+
+**IQR for worst color (D)**: $5834.5
+
+# 12- Price per Carat Box Plots by Color
+Price per carat of diamonds across the different colors of diamonds using boxplots:
+```{r}
+qplot(y=price/carat, x=color, data=diamonds, geom='boxplot')
+```
+
+# 12- Carat Frequency Polygon 
+Investigating the weight of the diamonds (carat) using a frequency polygon.
+```{r}
+qplot(diamonds$carat, binwidth=0.1, geom='freqpoly') + 
+  scale_x_continuous(limits = c(0, 5),
+                     breaks = seq(0, 5, 0.2))
+```
+
+**Answer:** Only 0.3 and 1.01 have a count greater 2000, 0.1, 0.8, 1.6, 2.0, 3.0 and 5.0 do not!
+
+# 13- Data Wrangling With R
+
+Useful Links: 
+
+- [Data Wrangling in R Intro](https://s3.amazonaws.com/udacity-hosted-downloads/ud651/DataWranglingWithR.pdf)
+- [Data Wrangling in R Cheat Sheet](http://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf)
+- [Other RStudio Cheat Sheets](http://www.rstudio.com/resources/cheatsheets/)
+
+```{r}
+# install.packages("tidyr")
+# install.packages("dplyr")
+```
+
+# 14- Gapminder Data
+
+Analyzing countries by gender about global health: let's see how the global health of different genders is doing in different countries over the years.
+```{r}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+
+# read data
+setwd('h:/Dokumente/GitHub/2015_Data_Analyst_Project_4/lesson3/')
+f <- read.csv('Suicide female indicator file UL 20100916.csv', header=T, check.names=F)
+m <- read.csv('Suicide male indicator file UL 20100916.csv', header=T, check.names=F)
+
+# rename first column to "country"
+colnames(f)[1] <- "country"
+colnames(m)[1] <- "country"
+
+# gather year rows into key-value pairs for columns "year" and "fraction"
+f.gathered <- tidyr::gather(f, "year", "fraction", 2:length(f))
+m.gathered <- tidyr::gather(m, "year", "fraction", 2:length(m))
+
+# add a "gender" column
+f.mutated <- dplyr::mutate(f.gathered, gender = "female")
+m.mutated <- dplyr::mutate(m.gathered, gender = "male")
+
+# throw data in same pot
+data.untidy <- dplyr::bind_rows(f.mutated, m.mutated)
+
+# final cleaning (re-ordering columns, filtering out NAs)
+data.tidy <- dplyr::filter(data.untidy[,c(1,2,4,3)], !is.na(fraction))
+
+# add meaningful sorting variable for each country
+data.order <- summarise(dplyr::group_by(data.tidy, country), mean(fraction))
+colnames(data.order)[2] <- "mean.fraction"
+data.joined <- dplyr::left_join(data.tidy, data.order, by="country")
+dplyr::arrange(data.joined, desc(mean.fraction))
+
+# Convert year to numeric
+data.joined$year = as.numeric(levels(data.joined$year))[data.joined$year]
+
+# Graph
+
+# Graph "fraction"" as y and "country" re-ordered by mean.fraction as x
+ggplot(data = data.joined, aes(x=reorder(country, -mean.fraction), y=fraction)) +
+  # Yearly data should appear as a color-coded data point (we are using a reversed terrain colour palette) 
+  geom_point(aes(colour=year)) +
+  scale_colour_gradientn(colours=rev(terrain.colors(length(f)-1)), name="Year") + 
+  # We also will plot the mean as a circle
+  geom_point(aes(y=mean.fraction, shape="O")) + 
+  scale_shape_discrete(name="Mean", labels=c("Mean")) +
+  # Facet wrap by gender
+  facet_wrap(~gender, ncol=1) + 
+  # Themes, Labels, Titles
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  xlab("Country") +
+  ylab("Suicide Rate per 1000 Capita") +
+  ggtitle("Suicide Rate for Different Countries over the Years, separated by Gender")
+
+```
+
+# 15- Analyzing Friends Birthdays
+Analyzing distribution of my friend's birthdays
+
+```{r}
+setwd('h:/Dokumente/GitHub/2015_Data_Analyst_Project_4/lesson3/')
+# Loading data
+birthdays <- read.csv('friends_birthdays.nogithub.csv', header=T, check.names=F)
+# Renaming Columns
+colnames(birthdays)[1] <- "Name"
+colnames(birthdays)[2] <- "Date"
+# Selecting relevant columns
+birthdays <- dplyr::select(birthdays, Name, Date)
+# Converting to Date
+birthdays$Date <- as.Date(birthdays$Date, format="%d.%m.%Y")
+# Cleaning: Replacing " birthday" / " Geburtstag" in Label (redundant)
+dplyr::transmute(birthdays, Name=gsub(" Geburtstag", "", Name))
+# Month and day
+birthdays$Month <- as.factor(format(birthdays$Date, "%m"))
+birthdays$Day   <- as.factor(format(birthdays$Date, "%d"))
+```
+
+## How many people share your birthday? Do you know them?
+```{r}
+subset(birthdays, Day=="02" & Month=="11")
+```
+Yes, one is me, the other one I know too.
+
+## How many birthdays are in each month?
+```{r}
+birthday.months <- dplyr::summarise(dplyr::group_by(birthdays, Month), Count=length(Month))
+```
+
+## Which month contains the most number of birthdays?
+```{r}
+dplyr::arrange(birthday.months, desc(Count))
+qplot(data=birthday.months, x=Month, y=Count, geom="bar", stat="identity", fill=I('blue'))
+```
+August has the most number of birthdays.
