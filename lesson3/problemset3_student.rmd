@@ -12,7 +12,6 @@ data(diamonds) # load data
 summary(diamonds) # summary of variables
 dim(diamonds) # dimensions (observations times variables)
 nrow(diamonds) # number of observations
-?diamonds # help
 ```
 
 **How many observations are in the data set?**: 53940
@@ -125,6 +124,7 @@ IQR(subset(diamonds, color=="J")$price)
 
 # 12- Price per Carat Box Plots by Color
 Price per carat of diamonds across the different colors of diamonds using boxplots:
+
 ```{r}
 qplot(y=price/carat, x=color, data=diamonds, geom='boxplot')
 ```
@@ -155,7 +155,8 @@ Useful Links:
 # 14- Gapminder Data
 
 Analyzing countries by gender about global health: let's see how the global health of different genders is doing in different countries over the years.
-```{r}
+
+```{r fig.width=15, fig.height=20}
 library(tidyr)
 library(dplyr)
 library(ggplot2)
@@ -183,30 +184,33 @@ data.untidy <- dplyr::bind_rows(f.mutated, m.mutated)
 # final cleaning (re-ordering columns, filtering out NAs)
 data.tidy <- dplyr::filter(data.untidy[,c(1,2,4,3)], !is.na(fraction))
 
-# add meaningful sorting variable for each country
-data.order <- summarise(dplyr::group_by(data.tidy, country), mean(fraction))
-colnames(data.order)[2] <- "mean.fraction"
-data.joined <- dplyr::left_join(data.tidy, data.order, by="country")
-dplyr::arrange(data.joined, desc(mean.fraction))
-
 # Convert year to numeric
-data.joined$year = as.numeric(levels(data.joined$year))[data.joined$year]
+data.tidy$year = as.numeric(levels(data.tidy$year))[data.tidy$year]
+
+# Compute most recent years stats
+data.now <- dplyr::summarise(dplyr::group_by(data.tidy, country, gender), nowyear=max(year)) %>%
+  dplyr::left_join(data.tidy, c("nowyear" = "year", "country" = "country", "gender" = "gender")) %>%
+  dplyr::rename(nowfraction=fraction)
+# Add summary stats to table
+data.tidy <- dplyr::left_join(data.tidy, data.now, c("country" = "country", "gender" = "gender"))
+
 
 # Graph
 
 # Graph "fraction"" as y and "country" re-ordered by mean.fraction as x
-ggplot(data = data.joined, aes(x=reorder(country, -mean.fraction), y=fraction)) +
+ggplot(data = data.tidy, aes(x=reorder(country, nowfraction), y=fraction)) +
   # Yearly data should appear as a color-coded data point (we are using a reversed terrain colour palette) 
-  geom_point(aes(colour=year)) +
+  geom_point(aes(colour=year, alpha=0.5)) +
   scale_colour_gradientn(colours=rev(terrain.colors(length(f)-1)), name="Year") + 
   # We also will plot the mean as a circle
-  geom_point(aes(y=mean.fraction, shape="O")) + 
-  scale_shape_discrete(name="Mean", labels=c("Mean")) +
+  geom_point(aes(y=nowfraction, shape="O")) + 
+  scale_shape_discrete(name="Most Recent", labels=c("Most Recent")) +
   # Facet wrap by gender
-  facet_wrap(~gender, ncol=1) + 
+  facet_wrap(~gender, ncol=2) + 
   # Themes, Labels, Titles
+  coord_flip() + 
   theme_bw() + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  #theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
   xlab("Country") +
   ylab("Suicide Rate per 1000 Capita") +
   ggtitle("Suicide Rate for Different Countries over the Years, separated by Gender")
@@ -216,7 +220,7 @@ ggplot(data = data.joined, aes(x=reorder(country, -mean.fraction), y=fraction)) 
 # 15- Analyzing Friends Birthdays
 Analyzing distribution of my friend's birthdays
 
-```{r}
+```{r results='hide'}
 setwd('h:/Dokumente/GitHub/2015_Data_Analyst_Project_4/lesson3/')
 # Loading data
 birthdays <- read.csv('friends_birthdays.nogithub.csv', header=T, check.names=F)
@@ -238,6 +242,7 @@ birthdays$Day   <- as.factor(format(birthdays$Date, "%d"))
 ```{r}
 subset(birthdays, Day=="02" & Month=="11")
 ```
+
 Yes, one is me, the other one I know too.
 
 ## How many birthdays are in each month?
@@ -250,4 +255,5 @@ birthday.months <- dplyr::summarise(dplyr::group_by(birthdays, Month), Count=len
 dplyr::arrange(birthday.months, desc(Count))
 qplot(data=birthday.months, x=Month, y=Count, geom="bar", stat="identity", fill=I('blue'))
 ```
+
 August has the most number of birthdays.
