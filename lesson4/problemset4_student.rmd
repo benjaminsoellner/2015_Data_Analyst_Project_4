@@ -324,19 +324,60 @@ grid.arrange(p1, p2, ncol=2)
 # ====================================================================
 suppressMessages(library(dplyr))
 suppressMessages(library(tidyr))
+suppressMessages(library(gridExtra))
+setwd('h:/Dokumente/GitHub/2015_Data_Analyst_Project_4/lesson4/')
 
-setwd('h:/Dokumente/GitHub/2015_Data_Analyst_Project_4/lesson3/')
-mentalhealth <- read.csv('Suicide male indicator file UL 20100916.csv', header=T, check.names=F)
-mentalhealth <- mentalhealth %>%
-  tidyr::gather("year", "fraction", 2:length(mentalhealth)) %>%
-  dplyr::filter(!is.na(fraction))
-mentalhealth$year = as.numeric(levels(mentalhealth$year))[mentalhealth$year]
-colnames(mentalhealth)[1] <- "country"
-mentalhealth.now <- mentalhealth %>%
-  dplyr::group_by(country) %>% 
-  dplyr::summarise(nowyear=max(year)) %>%
-  dplyr::left_join(mentalhealth, c("nowyear" = "year", "country" = "country")) %>%
-  dplyr::rename(nowfraction=fraction)
+# Function to read most recent year values from gapminder
+read.gapminder.data <- function(filename, v) {
+  filedata <- read.csv(filename, header=T, check.names=F)
+  filedata <- filedata %>%
+    tidyr::gather("Year", "Value", 2:length(filedata)) %>%
+    dplyr::filter(!is.na(Value))
+  filedata$Year <- as.numeric(levels(filedata$Year))[filedata$Year]
+  colnames(filedata)[1] <- "Country"
+  tidydata <- filedata %>%
+    dplyr::group_by(Country) %>% 
+    dplyr::summarise(Year=max(Year)) %>%
+    dplyr::left_join(filedata, c("Year" = "Year", "Country" = "Country"))
+  colnames(tidydata)[2] <- paste(c("Year.", v), collapse="") 
+  colnames(tidydata)[3] <- v
+  return(tidydata)
+} 
+
+# create huge table
+# condition for joining
+cc <- c("Country" = "Country")
+# read the data and join it all together
+mental.health <- suppressWarnings(
+    read.gapminder.data("Suicide male indicator file UL 20100916.csv", "SuicideRate") %>%
+    dplyr::left_join(read.gapminder.data("20120905_Indicator_Poverty headcount ratio at $1.25 a day (PPP) (% of population).csv", "PovertyRatio125"), cc) %>%
+    dplyr::left_join(read.gapminder.data("Indicator_Income share held by highest 10%.csv", "IncomeHighest10P"), cc) %>%
+    dplyr::left_join(read.gapminder.data("Indicator_Income share held by lowest 10%.csv", "IncomeLowest10P"), cc) %>%
+    dplyr::left_join(read.gapminder.data("indicator_per capita government expenditure on health at average exchange rate (us$).csv", "HealthSpending"), cc) %>%
+    dplyr::left_join(read.gapminder.data("indicator SI_POV_GINI.csv", "GINIIndex"), cc)
+  )
+
+# draw plots
+p1 <- ggplot(data=mental.health, aes(x=PovertyRatio125, y=SuicideRate)) + geom_point() + 
+  geom_smooth(method="lm") + xlab("Headcount Ratio at $1.25 a Day") + ylab("Suicide Rate per 1000 Capita")
+p2 <- ggplot(data=mental.health, aes(x=IncomeHighest10P, y=SuicideRate)) + geom_point() + 
+  geom_smooth(method="lm") + xlab("Income Share Held by the Highest 10%") + ylab("Suicide Rate per 1000 Capita")
+p3 <- ggplot(data=mental.health, aes(x=IncomeLowest10P, y=SuicideRate)) + geom_point() + 
+  geom_smooth(method="lm") + xlab("Income Share Held by the Lowest 10%") + ylab("Suicide Rate per 1000 Capita")
+p4 <- ggplot(data=mental.health, aes(x=HealthSpending, y=SuicideRate)) + geom_point() + 
+  geom_smooth(method="lm") + xlab("Per Capita Government Expediture on Health (US$)") + ylab("Suicide Rate per 1000 Capita")
+p5 <- ggplot(data=mental.health, aes(x=GINIIndex, y=SuicideRate)) + geom_point() + 
+  geom_smooth(method="lm") + xlab("GINI Index") + ylab("Suicide Rate per 1000 Capita")
+
+# arrange plots
+grid.arrange(p1,p2,p3,p4,p5, ncol=3)
+
+# summary stats
+cor.test(mental.health$SuicideRate, mental.health$PovertyRatio125)
+cor.test(mental.health$SuicideRate, mental.health$IncomeHighest10P)
+cor.test(mental.health$SuicideRate, mental.health$IncomeLowest10P)
+cor.test(mental.health$SuicideRate, mental.health$HealthSpending)
+cor.test(mental.health$SuicideRate, mental.health$GINIIndex)
 ```
 
 Material: 
