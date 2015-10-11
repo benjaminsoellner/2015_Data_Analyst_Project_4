@@ -380,11 +380,6 @@ cor.test(mental.health$SuicideRate, mental.health$HealthSpending)
 cor.test(mental.health$SuicideRate, mental.health$GINIIndex)
 ```
 
-Material: 
-
-- [Strong Relationship beteen Income and Mental Health by Frank Newport](http://www.gallup.com/poll/102883/strong-relationship-between-income-mental-health.aspx)
-- [The Prevalence, Distribution, and Mental Health Correlates of Perceived Discrimination in the United States by Roland C. Kessler et al.](http://www.aging.wisc.edu/midus/findings/pdfs/52.pdf)
-- [Mental Health And Criminal Justice by Paul E Mullen et al.](http://crg.aic.gov.au/reports/mullen.pdf)
 
 [Gapminder's Data](http://www.gapminder.org/data/)
 

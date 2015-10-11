@@ -15,6 +15,7 @@ Notes:
 Notes:
 
 ```{r Third Qualitative Variable}
+
 ggplot(aes(x = gender, y = age),
        data = subset(pf, !is.na(gender))) + geom_histogram()
 ```
