@@ -5,7 +5,20 @@ date: "10. Oktober 2015"
 output: html_document
 ---
 
-# 1- Price Histogram with Facet and Color
+# Preparations
+
+```{r}
+library(ggplot2)
+setwd('h:/Dokumente/GitHub/2015_Data_Analyst_Project_4/lesson4/')
+```
+
+# Questions about the Diamonds Dataset
+
+```{r}
+data(diamonds)
+```
+
+## 1- Price Histogram with Facet and Color
 
 ```{r}
 # Create a histogram of diamond prices.
@@ -24,11 +37,15 @@ output: html_document
 
 # ENTER YOUR CODE BELOW THIS LINE
 # ===========================================
+ggplot(data=diamonds, aes(x=price)) +
+  geom_histogram(aes(fill=cut)) + 
+  scale_fill_brewer(type='qual') + 
+  facet_wrap(~color)
 ```
 
 ***
 
-# 2- Price vs. Table Colored by Cut
+## 2- Price vs. Table Colored by Cut
 
 ```{r}
 # Create a scatterplot of diamond price vs.
@@ -47,15 +64,22 @@ output: html_document
 
 # ENTER YOUR CODE BELOW THIS LINE
 # ===========================================
+ggplot(data=diamonds, aes(x=price, y=table)) + 
+  geom_point(aes(color=cut)) + 
+  scale_color_brewer(type='qual')
 ```
 
-# 3- Typical Table Value
+***
 
-**What is the typical table range for the majority of diamonds of *ideal* cut?**
+## 3- Typical Table Value
 
-**What is the typical table range for the majority of diamonds of *premium* cut?**
+**What is the typical table range for the majority of diamonds of *ideal* cut?** 53-57
 
-# 4- Price vs. Volume and Diamond Clarity
+**What is the typical table range for the majority of diamonds of *premium* cut?** 58-62
+
+***
+
+## 4- Price vs. Volume and Diamond Clarity
 
 ```{r}
 # Create a scatterplot of diamond price vs.
@@ -79,9 +103,26 @@ output: html_document
 
 # ENTER YOUR CODE BELOW THIS LINE
 # ===========================================
+diamonds$volume = diamonds$x * diamonds$y * diamonds$z
+ggplot(data=diamonds, aes(x=volume, y=price)) + 
+  geom_point(aes(color=clarity)) + 
+  scale_color_brewer(type='div') + 
+  scale_y_log10() + 
+  xlim(0, quantile(diamonds$volume, 0.99))
 ```
 
-# 5- Proportion of Friendships Initiated
+***
+
+## Questions about the Facebook Dataset
+
+```{r}
+library(ggplot2)
+pf <- read.delim('pseudo_facebook.tsv')
+```
+
+***
+
+## 5- Proportion of Friendships Initiated
 
 ```{r}
 # Many interesting variables are derived from two or more others.
@@ -103,14 +144,28 @@ output: html_document
 
 # DO NOT DELETE THIS NEXT LINE OF CODE
 # ========================================================================
-pf <- read.delim('/datasets/ud651/pseudo_facebook.tsv')
+pf <- read.delim('pseudo_facebook.tsv')
 
 
 # ENTER YOUR CODE BELOW THIS LINE
 # ========================================================================
+pf$prop_initiated = pf$friendships_initiated/pf$friend_count
 ```
 
-# 6- prop_initiated vs. tenure
+***
+
+## A Few Further Preparations For Upcoming Questions
+
+```{r}
+pf$year_joined =  floor(2014 - pf$tenure/365)
+pf$year_joined.bucket <- cut(pf$year_joined, c(2004, 2009, 2011, 2012, 2014))
+pf$prop_initiated = pf$friendships_initiated/pf$friend_count
+pf.subset <- subset(pf, !is.na(prop_initiated))
+```
+
+***
+
+## 6- prop_initiated vs. tenure
 ```{r}
 # Create a line graph of the median proportion of
 # friendships initiated ('prop_initiated') vs.
@@ -137,11 +192,16 @@ pf <- read.delim('/datasets/ud651/pseudo_facebook.tsv')
 
 # ENTER YOUR CODE BELOW THIS LINE
 # ===========================================================
+                   
+ggplot(data=pf.subset, aes(x=tenure, y=prop_initiated)) + 
+  stat_summary(fun.y=mean, geom="line", aes(color=year_joined.bucket))
 ```
 
 NOTE: You may need to filter out missing data from your dataframe before you are able to create your plot.
 
-# 7- Smoothing prop_initiated vs. tenure
+***
+
+## 7- Smoothing prop_initiated vs. tenure
 
 ```{r}
 # Smooth the last plot you created of
@@ -158,24 +218,41 @@ NOTE: You may need to filter out missing data from your dataframe before you are
 
 # ENTER YOUR CODE BELOW THIS LINE
 # ====================================================
+ggplot(data=pf.subset, aes(x=tenure, y=prop_initiated)) + 
+  stat_summary(fun.y=mean, geom="line", aes(color=year_joined.bucket)) + 
+  geom_smooth()
 ```
 
-# 8- Greatest prop_initiated Group
+***
+
+## 8- Greatest prop_initiated Group
 
 On overage, which group initiated the greatest proportion of its Facebook friendships? The plot with the smoother that you created in the last exercise can help you answer this question?
 
 - People who joined prior to 2009
 - People who joined 2009-2011
 - People who joined 2011-2012
-- People who joined after 2012
+- **People who joined after 2012**
 
-# 9- Largest Group Mean prop_initiated
+***
 
-**For the group with the largest proportion of friendships initiated, what is the group's average (mean) proportion of friendships initiated?**
+## 9- Largest Group Mean prop_initiated
 
-**Why do you think this group's proportion of friendships initiated is higher than the others?**
+**For the group with the largest proportion of friendships initiated, what is the group's average (mean) proportion of friendships initiated?** 0.6653892
 
-# 10- Price/Carat Binned, Faceted, & Colored
+```{r}
+pf.subset %>% group_by(year_joined.bucket) %>% summarize(mean_prop_initiated=mean(prop_initiated))
+```
+
+**Why do you think this group's proportion of friendships initiated is higher than the others?** -- They are often times "late joiners to the game" and have a bigger user base to choose from.
+
+***
+
+# Revisiting the Diamonds Dataset
+
+***
+
+## 10- Price/Carat Binned, Faceted, & Colored
 
 ```{r}
 # Create a scatter plot of the price/carat ratio
@@ -196,9 +273,18 @@ On overage, which group initiated the greatest proportion of its Facebook friend
 
 # ENTER YOUR CODE BELOW THIS LINE
 # ===========================================
+ggplot(data=diamonds, aes(x=cut, y=price/carat)) + 
+  geom_jitter(aes(color=color)) + 
+  scale_color_brewer(type = 'div') + 
+  facet_wrap(~clarity)
 ```
+***
 
-# 11- Gapminder Multivariate Analysis
+# Gapminder Dataset
+
+***
+
+## 11- Gapminder Multivariate Analysis
 
 ```{r}
 # The Gapminder website contains over 500 data sets with information about
