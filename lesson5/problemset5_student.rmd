@@ -2,14 +2,14 @@
 title: "Problem Set 5"
 author: "Benjamin Söllner"
 date: "10. Oktober 2015"
-output: html_document
+output: pdf_document
 ---
 
 # Preparations
 
 ```{r}
 library(ggplot2)
-setwd('h:/Dokumente/GitHub/2015_Data_Analyst_Project_4/lesson4/')
+setwd('h:/Dokumente/GitHub/2015_Data_Analyst_Project_4/lesson5/')
 ```
 
 # Questions about the Diamonds Dataset
@@ -241,6 +241,7 @@ On overage, which group initiated the greatest proportion of its Facebook friend
 **For the group with the largest proportion of friendships initiated, what is the group's average (mean) proportion of friendships initiated?** 0.6653892
 
 ```{r}
+library(dplyr)
 pf.subset %>% group_by(year_joined.bucket) %>% summarize(mean_prop_initiated=mean(prop_initiated))
 ```
 
@@ -308,5 +309,55 @@ ggplot(data=diamonds, aes(x=cut, y=price/carat)) +
 # Copy and paste all of the code that you used for
 # your investigation, and submit it when you are ready.
 # ============================================================================================
+library(GGally)
+
+read.gapminder.data <- function(filename, v) {
+  filedata <- read.csv(filename, header=T, check.names=F)
+  filedata <- filedata %>%
+    tidyr::gather("Year", "Value", 2:length(filedata)) %>%
+    dplyr::filter(!is.na(Value))
+  filedata$Year <- as.numeric(levels(filedata$Year))[filedata$Year]
+  colnames(filedata)[1] <- "Country"
+  tidydata <- filedata %>%
+    dplyr::group_by(Country) %>% 
+    dplyr::summarise(Year=max(Year)) %>%
+    dplyr::left_join(filedata, c("Year" = "Year", "Country" = "Country"))
+  colnames(tidydata)[2] <- paste(c("Year.", v), collapse="") 
+  colnames(tidydata)[3] <- v
+  return(tidydata)
+}
+
+cc <- c("Country" = "Country")
+gapminder.data <- suppressWarnings(
+    read.gapminder.data("indicator gapminder gdp_per_capita_ppp.csv", "GDPPerCapita") %>%
+    dplyr::left_join(read.gapminder.data("indicator gapminder under5mortality.csv", "Under5Mortality"), cc) %>%
+    dplyr::left_join(read.gapminder.data("indicator_crude birth rate (births per 1000 population).csv", "BirthPer1000"), cc) %>%
+    dplyr::left_join(read.gapminder.data("indicator_one-year-olds immunized with three doses of hepatitis b (hepb3) (%).csv", "VaccinatedP"), cc) %>%
+    dplyr::left_join(read.gapminder.data("Years in school women 15 to 44.csv", "WomenAvgYearsInSchool"), cc) %>%
+    dplyr::filter(!is.na(GDPPerCapita) & !is.na(Under5Mortality) & !is.na(BirthPer1000) & !is.na(VaccinatedP) & !is.na(WomenAvgYearsInSchool))
+  )
+
+# master plot to show corellation between any two variables
+gapminder.data.subset <- gapminder.data[, c(3,5,7,9,11)]
+names(gapminder.data.subset)
+names(gapminder.data.subset)
+ggpairs(gapminder.data.subset)
+
+color.spread = floor(max(gapminder.data.subset$Under5Mortality)-min(gapminder.data.subset$Under5Mortality))
+
+# Under 5 y Mortality depending on Birth Rate & GDP per Capita
+ggplot(data=gapminder.data.subset, aes(y = GDPPerCapita, x = BirthPer1000)) + 
+  geom_point(aes(color = Under5Mortality)) + 
+  scale_color_gradientn(colours=colorRampPalette(c("green", "yellow", "orange", "red"))(color.spread), name="Under 5 y. Mortality per 1000") + 
+  xlab("Birth Rate per 1000") +
+  ylab("GDP per Capita")
+
+# Under 5 y Mortality depending on Birth Rate & GDP per Capita
+ggplot(data=gapminder.data.subset, aes(y = WomenAvgYearsInSchool, x = VaccinatedP)) + 
+  geom_point(aes(color = Under5Mortality)) + 
+  scale_color_gradientn(colours=colorRampPalette(c("green", "yellow", "orange", "red"))(color.spread), name="Under 5 y. Mortality per 1000") + 
+  xlab("One-year-olds immunized with three doses of Hepatitis B (%)") +
+  ylab("Average years of Women in School")
+
 ```
 
