@@ -1,0 +1,40 @@
+---
+title: "Data Analyst Project 4 - Explorative Data Analysis with R on the 'Prosper' Loan Dataset"
+author: "Benjamin Söllner"
+date: "21. Oktober 2015"
+output: html_document
+---
+
+# Preparations
+
+```{r Preparations}
+setwd("h:/Dokumente/GitHub/2015_Data_Analyst_Project_4/")
+prosper <- read.csv("project/prosperLoanData.csv")
+str(prosper)
+```
+
+# First Observations from the Data Structure
+
+## Eliminating fully correlating variables
+
+## Potential Interesting Questions
+
+# Final Plots and Summaries
+
+**TODO:** at least 3 plots which do at least 2 of the following:
+
+* draw comparisons
+* identify trends
+* engage a wide audience
+* explain a complicated finding
+* clarify a gap between perception and reality
+* enable the reader to digest large amounts of information
+
+# Reflection
+
+**TODO:**
+
+* Where did I run into difficulties?
+* Where did I find successes?
+* How could the analysis be enriched in the future (additional data and analyses)?
+* Potentially: Decisions taken?
