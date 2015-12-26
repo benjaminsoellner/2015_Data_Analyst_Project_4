@@ -29,7 +29,7 @@ First, we load libraries and define some functions to achieve a unique
 'look and feel' and some shortcuts for the plotting styles most commonly
 used in this project.
 
-```{r preparations, warning=FALSE, message=FALSE}
+```{r preparations, warning=FALSE, message=FALSE, echo=FALSE}
 library(ggplot2) # plotting 
 library(gridExtra) # arranging multiple plots in one figure
 library(grid) 
@@ -159,18 +159,41 @@ ggplot_boxplot <- function(data, x, y, xlab="", title="", yscale=NA, ylab="",
   return(p)
 }
 
+# Colors and gradients to visualize corellation:
+# palette with 200 steps over shades of blue
+blue_gradient <- colorRampPalette(c("lightskyblue","royalblue","navy"))(200)
+# palette with 200 steps over shades of red
+red_gradient <- colorRampPalette(c("darkred","red2","mistyrose"))(200)
+# gradient to show corellation with legend named "Corellation", transitioning
+# from red to white to light yellow to blue mapped to -1.0,..,-0.1,0.1,..,1.0
+cor_fill_gradient <- scale_fill_gradientn(name="Corellation",
+                       colours=c(red_gradient,"lightyellow","lightyellow",blue_gradient),
+                       na.value="grey", limits=c(-1,1),
+                       breaks=c(-1.0,-0.5,-0.1,0.1,0.5,1.0),
+                       values=c(
+                           rescale(1:201,to=c(0.0,0.45)),
+                           rescale(1:201,to=c(0.55,1.0))
+                         ))
+
+# There is an issue with my version of ggcorr not displaying the corellation 
+# values continuously: somehow it does not set the parameter "nbreaks"
+# correctly. The following pulls the most up-to-date version from GitHub
+# with which I do not encounter any problems (potential attack vector though).
+source("https://raw.githubusercontent.com/briatte/ggcorr/master/ggcorr.R")
 ```
 
 # First Observations
 
 We load the data and assess its structure:
 
-```{r load data}
+```{r load data, warning=FALSE, echo=FALSE}
 # load data
-setwd("h:/Dokumente/GitHub/2015_Data_Analyst_Project_4/")
+setwd("h:/Dokumente/GitHub/DAND_4_ExplorativeDataAnalysisR/")
 wine <- read.csv("project/wineQualityWhites.csv")
 # read and display data structure
+cat("Data set structure: ")
 str(wine)
+cat("Data set dimension: ")
 dim(wine)
 ```
 
@@ -182,6 +205,8 @@ Let's look at the distribution of the key chemical parameters one-by-one
 by plotting their distribution and their statistical (```summary(...)```)
 properties.
 
+# Univariate Analysis
+
 ## Fixed Acidity (Tartaric Acid) in $\text{g}/\text{l}$
 
 *Most acids involved with wine are fixed or nonvolatile (do not
@@ -190,9 +215,9 @@ evaporate readily).*
 Fixed acidity seems normally distributed
 ($\mu = 6.800 \frac{\text{g}}{\text{l}}, \sigma = 0.843 \frac{\text{g}}{\text{dm}^3}$).
 
-```{r fixed acitity, warning=FALSE}
+```{r fixed acitity, warning=FALSE, message=FALSE, echo=FALSE}
 summary(wine$fixed.acidity)
-sd(wine$fixed.acidity) # Standard deviation
+cat("Standard deviation:", sd(wine$fixed.acidity))
 
 ggplot_normdist(
     data=wine, x="fixed.acidity", binwidth=0.1, xscale=c(3.5, 11, 0.5),
@@ -212,9 +237,9 @@ by an order of magnitude, their distribution
 ($\mu = 0.2782 \frac{\text{g}}{\text{l}}, \sigma = 0.1008 \frac{\text{g}}{\text{dm}^3}$)
 is slightly skewed to the left.
 
-```{r volatile acidity}
+```{r volatile acidity, echo=FALSE}
 summary(wine$volatile.acidity)
-sd(wine$volatile.acidity)
+cat("Standard deviation:", sd(wine$volatile.acidity))
 
 ggplot_hist(
      data=wine, x="volatile.acidity", binwidth=0.02, xscale=c(0, 0.9, 0.05), 
@@ -234,9 +259,9 @@ comparable distribution to the volatile acidity
 ($\mu = 0.3342 \frac{\text{g}}{\text{l}}, \sigma = 0.1210 \frac{\text{g}}{\text{dm}^3}$).
 Left-skewedness seems to be smaller.
 
-```{r citric acidity}
+```{r citric acidity, echo=FALSE}
 summary(wine$citric.acid)
-sd(wine$citric.acid)
+cat("Standard deviation:", sd(wine$citric.acid))
 
 ggplot_hist(
      data=wine, x="citric.acid", binwidth=0.02, xscale=c(0, 1.4, 0.1),
@@ -244,81 +269,6 @@ ggplot_hist(
      xlab="Cidric acid in g/l",
      ylab="Number of wines with this citric acidity"
   )
-```
-
-## Multivariate Analysis: Acidity Values
-
-The following graph shows the relationship between the acidity distributions.
-Notice how fixed acidity is broader spread and generally higher than citric
-and volatile acidity.
-
-```{r volatile acidity + cidric acid + fixed acidity, warning=FALSE}
-# Create a dataframe with the columns acidtype, acidvalue and fill it 
-# with all of the values for citric.acid, volatile.acidity,
-# fixed.acidity for all of the wines ...
-wineacids <- wine %>%                                                                                                        
-  dplyr::select(citric.acid, volatile.acidity, fixed.acidity) %>%
-  tidyr::gather("acidtype","acidvalue", 1:3)
-
-# ... then plot those as overlayed histograms
-ggplot_hist(
-     data=wineacids, x="acidvalue", binwidth=0.1, xscale=c(0, 11, 0.5),
-     xlab="Acidity in g/dm³",
-     title="Distribution of all acidities",
-     ylab="Number of wines with this acidity",
-     fill="acidtype", fillname="Type of Acid", median=F
-  )
-```
-
-Does one type of acid come with another type of acid? That is,
-are any two of the acidity values corellated?
-
-```{r relationship acids, warning=FALSE}
-cor(wine[, c("fixed.acidity", "volatile.acidity", "citric.acid")],
-    wine[, c("fixed.acidity", "volatile.acidity", "citric.acid")])
-```
-
-We can find that
-fixed acidity and citric acidity are slightly positively
-corellated ($r = 0.289$), that means, where more fixed
-acidity is present, also more citric acidity is present.
-
-The next plot shows this, but notice the significant spread in
-the middle of both acidity distributions.
-
-```{r relationship fixed acidity vs. cidric acid, warning=FALSE}
-ggplot_corr(
-    data=wine, x="fixed.acidity", y="citric.acid", 
-    xscale=c(3.5, 11, 0.5), yscale=c(0, 1.4, 0.1),
-    xlab="Fixed acidity (tartaric acid) in g/l",
-    ylab="Citric acidity in g/l",
-    title="Fixed acidity vs. citric acidity"
-  )
-```
-
-However, we find that volatile acidity is slightly negatively
-corellated with both types of acidity
-($r_\text{fixed} = -0.0227, r_\text{citric} = -0.1495$ - 
-hinting at that for wines with volatile acidity, less of the
-other two kinds of acids are present. The next two plots
-show this relationship.
-
-```{r relationship volatile.acidity vs. acids, warning=FALSE}
-p1 <- ggplot_corr(
-    data=wine, x="volatile.acidity", y="fixed.acidity", 
-    xscale=c(0, 0.9, 0.05), yscale=c(3.5, 11, 0.5), 
-    xlab="Volatile acidity (acetic acid) in g/l",
-    ylab="Fixed acidity (tartaric acid) in g/l",
-    title="Volatile acidity vs. fixed acidity"
-  )
-p2 <- ggplot_corr(
-    data=wine, x="volatile.acidity", y="citric.acid", 
-    xscale=c(0, 0.9, 0.05), yscale=c(0, 1.4, 0.1),
-    xlab="Volatile acidity (acetic acid) in g/l",
-    ylab="Citric acidity in g/l",
-    title="Volatile acidity vs. citric acidity"
-  )
-grid.arrange(p1, p2, nrow=1)
 ```
 
 ## pH
@@ -330,9 +280,9 @@ As expected, we find the pH value distribution with a mean between 3-4
 ($\mu = 3.188$), most likely influenced by the most prevalent acid
 (fixed acids).
 
-```{r pH, warning=FALSE}
+```{r pH, warning=FALSE, echo=FALSE}
 summary(wine$pH)
-sd(wine$pH)
+cat("Standard deviation:", sd(wine$pH))
 
 ggplot_normdist(
      data=wine, x="pH", binwidth=0.02, xscale=c(2.6, 4.0, 0.2),
@@ -340,63 +290,6 @@ ggplot_normdist(
      ylab="Number of wines with this pH value",
      title="pH value"
   )
-```
-
-## Multivariate Analysis: pH vs. Acidity
-
-pH is a measure for acidity, but are pH value and the concentration-values
-of each acid corellated or does any of the acid concentractions have a 
-particulary strong influence? We also create a new "sum-by-concentration"
-variable ```acidtity``` where we just add the concentration of all acids.
-
-We find, as expected, the strongest (negative) corellation between pH and
-the most prevalent, fixed, acidity ($r = -0.4258$). Calculating $r^2$ or
-for how much variability in pH this acidity accounts, we get $r^2 = 0.1814$,
-which is rather small, but we have to take into account the chemical
-properties: in a wine, there might be basic molecules which counteract
-acid components and drive the pH up.
-
-```{r relationship acidity vs. pH, warning=FALSE}
-# Create aggregate (sum) variable of all acidities
-wine$acidity <- wine$fixed.acidity + wine$volatile.acidity + wine$citric.acid
-
-# Pearsons R
-cor(wine[, c("fixed.acidity", "volatile.acidity", "citric.acid", "acidity")],
-    wine$pH)
-
-# R^2 - For how much variability in pH the acidity variables account 
-cor(wine[, c("fixed.acidity", "volatile.acidity", "citric.acid", "acidity")],
-    wine$pH)^2
-
-p1 <- ggplot_corr(
-    data=wine, x="fixed.acidity", y="pH",
-    xscale=c(3.5, 11, 0.5), yscale=c(2.6, 4.0, 0.2),
-    xlab="Fixed acidity (tartaric acid) in g/l",
-    ylab="pH",
-    title="Fixed acidity vs. pH"
-  )
-p2 <- ggplot_corr(
-    data=wine, x="volatile.acidity", y="pH", 
-    xscale=c(0, 0.9, 0.05), yscale=c(2.6, 4.0, 0.2),
-    xlab="Volatile acidity (acetic acid) in g/l",
-    ylab="pH",
-    title="Volatile acidity vs. pH"
-  )
-p3 <- ggplot_corr(
-    data=wine, x="citric.acid", y="pH", 
-    xscale=c(0, 1.4, 0.1), yscale=c(2.6, 4.0, 0.2),
-    xlab="Citric acidity in g/l",
-    ylab="pH",
-    title="Citric acidity vs. pH"
-  )
-p4 <- ggplot_corr(
-    data=wine, x="acidity", y="pH", 
-    xscale=c(3.5, 12, 0.5), yscale=c(2.6, 4.0, 0.2),
-    xlab="Sum of acid concentrations in g/l",
-    ylab="pH",
-    title="'Total' acidity vs. citric acidity"
-  )
-grid.arrange(p1, p2, p3, p4, nrow=2)
 ```
 
 ## Chloride Concentration in $\text{g}/\text{l}$
@@ -411,15 +304,14 @@ a fitted bell curve. Delimited by dashed lines in belows graph is the 90%
 confidence interval which the largest part of the bell curve would cover.
 It will be interesting to see, if/how those outliers affect wine quality.
 
-```{r chlorides, warning=FALSE}
+```{r chlorides, warning=FALSE, echo=FALSE}
 summary(wine$chlorides)
-sd(wine$chlorides)
-
-quantile(wine$chlorides, 3/4)
+cat("Standard deviation:", sd(wine$chlorides))
+cat("75%-quantile:", quantile(wine$chlorides, 3/4))
 
 ggplot_hist(
-     data=wine, x="chlorides", binwidth=0.002, xscale=c(0, 0.2, 0.01),
-     title="Distribution of chlorides (salts)",                                                                              
+     data=wine, x="chlorides", binwidth=0.002, xscale=c(0, 0.2, 0.02),
+     title="Distribution of chlorides (salts)",
      xlab="Chlorides in g/l",
      ylab="Number of wines with this amount of chlorides"
   ) + 
@@ -439,10 +331,10 @@ making the fitted normal distribution curve
 slightly more left-skewed and broader. There is one extreme outlier
 >150 mg/l which we will just tabulate and not include in the graph
 
-```{r free sulfur dioxide, warning=FALSE}
+```{r free sulfur dioxide, warning=FALSE, echo=FALSE}
 summary(wine$free.sulfur.dioxide)
-sd(wine$free.sulfur.dioxide)
-
+cat("Standard deviation:", sd(wine$free.sulfur.dioxide))
+cat("The one outlier with free sulfur dioxide > 150 mg/l:")
 subset(wine, free.sulfur.dioxide > 150)
 
 ggplot_normdist(
@@ -466,36 +358,15 @@ times higher than the average free sulfur dioxide content. The
 left-skewedness is less noticable than for free sulfur dioxide contents
 and the "long-tail" on the right is shorter.
 
-```{r total sulfur dioxide, warning=FALSE}
+```{r total sulfur dioxide, warning=FALSE, echo=FALSE}
 summary(wine$total.sulfur.dioxide)
-sd(wine$total.sulfur.dioxide)
+cat("Standard deviation:", sd(wine$total.sulfur.dioxide))
 
 ggplot_normdist(
-     data=wine, x="total.sulfur.dioxide", binwidth=2, xscale=c(0, 400, 10),
+     data=wine, x="total.sulfur.dioxide", binwidth=2, xscale=c(0, 350, 20),
      title="Total sulfur dioxide",
      xlab="Total sulfur dioxide in mg/dm³",
      ylab="Number of wines with this amount of total SO2"
-  )
-```
-
-## Multivariate Analysis: Total vs. Free Sulfur Dioxide
-
-Analyzing the corellation between total and free sulfur dioxide content
-we find that with an increase of total sulfur dioxide by 1 mg/l, free
-sulfur dioxide increases by $r = 0.6155 \frac{\text{mg}}{\text{l}}$ and
-mostly accounts for the majority of sulfur dioxide increase. However,
-variability of the free sulfur dioxide content increases with a higher
-total sulfur dioxide content.
-
-```{r total vs. free sulfur dioxide, warning=FALSE}
-cor(wine$total.sulfur.dioxide, wine$free.sulfur.dioxide)
-
-ggplot_corr(
-    data=wine, x="total.sulfur.dioxide", y="free.sulfur.dioxide", 
-    xscale=c(0, 300, 20), yscale=c(0, 160, 20),
-    xlab="Total sulfur dioxide in mg/dm³",
-    ylab="Free sulfur dioxide in mg/dm³",
-    title="Total sulfur dioxide vs. free sulfur dioxide"
   )
 ```
 
@@ -508,9 +379,9 @@ antioxidant.*
 We see a slightly left-skewed distribution of sulphate content
 ($\mu = 0.4898 \frac{\text{g}}{\text{l}}, $). 
 
-```{r sulphates}
+```{r sulphates, echo=FALSE}
 summary(wine$sulphates)
-sd(wine$sulphates)
+cat("Standard deviation:", sd(wine$sulphates))
 
 ggplot_hist(
      data=wine, x="sulphates", binwidth=0.01, xscale=c(0.2, 1.000, 0.05),
@@ -520,32 +391,7 @@ ggplot_hist(
   )
 ```
 
-## Multivariate Analysis: Sulphates vs. Total Sulfur Dioxide
-
-Let's verify to which extent the variable description holds true and
-how much sulfates really contribute to 'unpleasant' SO2 levels.
-Calculating the $r$, we find just $r = 0.1345$ and $r^2 = 0.0181$, 
-showing that variability of the sulphate only describes 1.8% percent
-of the variability in the sulfur dioxide level and therefore is not
-a very good indicator for total sulfur dioxide level. The 
-corellation for free sulfur dioxide is even lower
-($r_\text{free} = 0.0592$).
-
-```{r sulphates vs. total sulfur dioxide, warning=FALSE}
-cor(wine$sulphates, wine$total.sulfur.dioxide)
-cor(wine$sulphates, wine$total.sulfur.dioxide)^2
-cor(wine$sulphates, wine$free.sulfur.dioxide)
-
-ggplot_corr(
-    data=wine, x="sulphates", y="total.sulfur.dioxide", 
-    xscale=c(0.2, 1.000, 0.05), yscale=c(0, 300, 20),
-    xlab="Sulphates in the wine in g/dm³",
-    ylab="Total sulfur dioxide in mg/dm³",
-    title="Sulphates vs. total sulfur dioxide"
-  )
-```
-
-## Residual Sugar
+## Residual Sugar ($\text{g}/\text{l}$)
 
 *The amount of sugar remaining after fermentation stops, it's rare to find
 wines with less than 1 gram/liter and wines with greater than 45 
@@ -560,9 +406,9 @@ There is only one sweet wine (with sugar content of over 45 g/l), which we
 will not show but tabulate. It seems to be a wine rated slightly above average
 (score 6).
 
-```{r residual sugar}
+```{r residual sugar, echo=FALSE}
 summary(wine$residual.sugar)
-
+cat("The only sweet wine with residual sugar > 45 g/l:")
 subset(wine, residual.sugar > 45) # tabulate the only sweet wine
 
 ggplot_hist(
@@ -580,7 +426,7 @@ local maxima ($\mu = 10.5%, \text{max} = 14.2%, \text{min} = 8.0%$).
 It is to be expected, that each wine flavor on the market contributes
 to the overall distribution with their signature distributions.
 
-```{r alcohol}
+```{r alcohol, echo=FALSE}
 summary(wine$alcohol)
 
 ggplot_hist(
@@ -588,28 +434,6 @@ ggplot_hist(
      title="Alcohol level", 
      xlab="Alcohol level in % by volume",
      ylab="Number of wines with that alcohol level"
-  )
-```
-
-## Multivariate Analysis: Residual Sugar vs. Alcohol
-
-Gestation creates alcohol from sugar, therefore, with more alcohol in the wine,
-we expect less sugar; indeed, the values are negatively corellated
-($r = -0.4506$). The graph below shows that indeed, a higher residual sugar
-content leads to less alcohol, but we also note, that the spread of the
-alcohol content is much higher for wines with lower sugar content,
-suggesting perhaps, that some wines may have not enough sugar to turn into
-alcohol to begin with. 
-
-```{r residual sugar vs. alcohol}
-cor(wine$residual.sugar, wine$alcohol)
-
-ggplot_corr(
-    data=wine, x="residual.sugar", y="alcohol", 
-    xscale=c(0, 45, 2), yscale=c(8, 14, 0.5),
-    xlab="Residual sugar in g/dm³", 
-    ylab="Alcohol level in % by volume",
-    title="Residual sugar vs. alcohol level"
   )
 ```
 
@@ -622,9 +446,9 @@ Wine density is somewhat tightly normally distributed around the
 density of water
 ($\mu = 0.9940 \frac{\text{kg}}{\text{l}}, \sigma = 2.9 \frac{\text{g}}{\text{l}}).
 
-```{r density, warning=FALSE}
+```{r density, warning=FALSE, echo=FALSE}
 summary(wine$density)
-sd(wine$density)
+cat("Standard deviation:", sd(wine$density))
 
 ggplot_normdist(
      data=wine, x="density", binwidth=0.0005, xscale=c(0.985, 1.005, 0.005),
@@ -634,7 +458,243 @@ ggplot_normdist(
   )
 ```
 
-## Multivariate Analysis: Density vs. Sugar & Alcohol Level
+## Output Variable: Quality based on Sensory Data (0-10)
+
+The following graph shows the overall distribution of the score that
+was given to the wines. It ranges from 3 to 9, with 20 wines being
+in the worst category (3), 5 in the best (9) and most wines (2198)
+scoring a "6" slightly above average (5.86) and the mid-point value
+that could be avarded (5), potentially showing a psychological 
+bias of the wine testers to slightly overscore wines.
+
+```{r quality, echo=FALSE}
+summary(wine$quality)
+cat("Absolute frequency of output variable 'quality':")
+table(wine$quality)
+ggplot_hist(
+     data=wine, x="quality", binwidth=1, xscale=c(0, 10, 1),
+     title="Quality Score ",
+     xlab="Quality Score (0-10)",
+     ylab="Number of Wines having that Quality"
+  )
+```
+
+# Bivariate Analysis
+
+## Acidity Values
+
+The following graph shows the acidity distributions, each one with a different
+color, all overlayed in one diagram. Notice how the distribution of citric 
+acidity and volatile acidity is much skinnier and has a lower mean while
+fixed acidity has a higher mean and broader distribution.
+
+```{r volatile acidity + cidric acid + fixed acidity, warning=FALSE}
+# Create a dataframe with the columns acidtype, acidvalue and fill it 
+# with all of the values for citric.acid, volatile.acidity,
+# fixed.acidity for all of the wines ...
+wineacids <- wine %>%
+  dplyr::select(citric.acid, volatile.acidity, fixed.acidity) %>%
+  tidyr::gather("acidtype","acidvalue", 1:3)
+```
+
+```{r volatile acidity + cidric acid + fixed acidity graph, warning=FALSE, echo=FALSE}
+# ... then plot those as overlayed histograms
+ggplot_hist(
+     data=wineacids, x="acidvalue", binwidth=0.1, xscale=c(0, 11, 1),
+     xlab="Acidity in g/dm³",
+     title="Distribution of all acidities",
+     ylab="Number of wines with this acidity",
+     fill="acidtype", fillname="Type of Acid", median=F
+  )
+```
+
+Does one type of acid come with another type of acid? That is,
+are any two of the acidity values corellated? We can plot the corellation
+matrix:
+
+```{r relationship acids, warning=FALSE, echo=FALSE}
+cor(wine[, c("fixed.acidity", "volatile.acidity", "citric.acid")],
+    wine[, c("fixed.acidity", "volatile.acidity", "citric.acid")])
+```
+
+We can find that
+fixed acidity and citric acidity are slightly positively
+corellated ($r = 0.289$), that means, where more fixed
+acidity is present, also more citric acidity is present.
+
+The next plot shows this, but notice the significant spread in
+the middle of both acidity distributions.
+
+```{r relationship fixed acidity vs. cidric acid, warning=FALSE, echo=FALSE}
+ggplot_corr(
+    data=wine, x="fixed.acidity", y="citric.acid", 
+    xscale=c(3.5, 11, 0.5), yscale=c(0, 1.4, 0.1),
+    xlab="Fixed acidity (tartaric acid) in g/l",
+    ylab="Citric acidity in g/l",
+    title="Fixed acidity vs. citric acidity"
+  )
+```
+
+However, we find that volatile acidity is slightly negatively
+corellated with both types of acidity
+($r_\text{fixed} = -0.0227, r_\text{citric} = -0.1495$ - 
+hinting at that for wines with volatile acidity, less of the
+other two kinds of acids are present. The next two plots
+show this relationship.
+
+```{r relationship volatile.acidity vs. acids, warning=FALSE, echo=FALSE}
+p1 <- ggplot_corr(
+    data=wine, x="volatile.acidity", y="fixed.acidity", 
+    xscale=c(0, 0.9, 0.1), yscale=c(3.5, 11, 0.5), 
+    xlab="Volatile acidity (acetic acid) in g/l",
+    ylab="Fixed acidity (tartaric acid) in g/l",
+    title="Volatile acidity vs. fixed acidity"
+  )
+p2 <- ggplot_corr(
+    data=wine, x="volatile.acidity", y="citric.acid", 
+    xscale=c(0, 0.9, 0.1), yscale=c(0, 1.4, 0.1),
+    xlab="Volatile acidity (acetic acid) in g/l",
+    ylab="Citric acidity in g/l",
+    title="Volatile acidity vs. citric acidity"
+  )
+grid.arrange(p1, p2, nrow=1)
+```
+
+## pH vs. Acidity
+
+pH is a measure for acidity, but are pH value and the concentration-values
+of each acid corellated or does any of the acid concentractions have a 
+particulary strong influence? We also create a new "sum-by-concentration"
+variable ```acidtity``` where we just add the concentration of all acids.
+
+We find, as expected, the strongest (negative) corellation between pH and
+the most prevalent, fixed, acidity ($r = -0.4258$). Calculating $r^2$ or
+for how much variability in pH this acidity accounts, we get $r^2 = 0.1814$,
+which is rather small, but we have to take into account the chemical
+properties: in a wine, there might be basic molecules which counteract
+acid components and drive the pH up. Displayed below are some corellation
+matrices between pH and other variables as well as the respective
+scatter plots relating both variables.
+
+```{r relationship acidity vs. pH, warning=FALSE, echo=FALSE}
+# Create aggregate (sum) variable of all acidities
+wine$acidity <- wine$fixed.acidity + wine$volatile.acidity + wine$citric.acid
+
+# Pearsons R
+cat("Corellation matrix between fixed acidity and ...:")
+cor(wine[, c("fixed.acidity", "volatile.acidity", "citric.acid", "acidity")],
+    wine$pH)
+
+# R^2 - For how much variability in pH the acidity variables account 
+cat("R^2 value between fixed acidity and ...:")
+cor(wine[, c("fixed.acidity", "volatile.acidity", "citric.acid", "acidity")],
+    wine$pH)^2
+
+p1 <- ggplot_corr(
+    data=wine, x="fixed.acidity", y="pH",
+    xscale=c(3.5, 11, 0.5), yscale=c(2.6, 4.0, 0.4),
+    xlab="Fixed acidity (tartaric acid) in g/l",
+    ylab="pH",
+    title="Fixed acidity vs. pH"
+  )
+p2 <- ggplot_corr(
+    data=wine, x="volatile.acidity", y="pH", 
+    xscale=c(0, 0.9, 0.05), yscale=c(2.6, 4.0, 0.4),
+    xlab="Volatile acidity (acetic acid) in g/l",
+    ylab="pH",
+    title="Volatile acidity vs. pH"
+  )
+p3 <- ggplot_corr(
+    data=wine, x="citric.acid", y="pH", 
+    xscale=c(0, 1.4, 0.1), yscale=c(2.6, 4.0, 0.4),
+    xlab="Citric acidity in g/l",
+    ylab="pH",
+    title="Citric acidity vs. pH"
+  )
+p4 <- ggplot_corr(
+    data=wine, x="acidity", y="pH", 
+    xscale=c(3.5, 12, 0.5), yscale=c(2.6, 4.0, 0.4),
+    xlab="Sum of acid concentrations in g/l",
+    ylab="pH",
+    title="'Total' acidity vs. citric acidity"
+  )
+grid.arrange(p1, p2, p3, p4, nrow=2)
+```
+
+## Total vs. Free Sulfur Dioxide
+
+Analyzing the corellation between total and free sulfur dioxide content
+we find that with an increase of total sulfur dioxide by 1 mg/l, free
+sulfur dioxide increases by $r = 0.6155 \frac{\text{mg}}{\text{l}}$ and
+mostly accounts for the majority of sulfur dioxide increase. However,
+variability of the free sulfur dioxide content increases with a higher
+total sulfur dioxide content.
+
+```{r total vs. free sulfur dioxide, warning=FALSE, echo=FALSE}
+cat("Correlation total vs. free sulfur dioxide:", 
+    cor(wine$total.sulfur.dioxide, wine$free.sulfur.dioxide))
+
+ggplot_corr(
+    data=wine, x="total.sulfur.dioxide", y="free.sulfur.dioxide", 
+    xscale=c(0, 300, 20), yscale=c(0, 160, 20),
+    xlab="Total sulfur dioxide in mg/dm³",
+    ylab="Free sulfur dioxide in mg/dm³",
+    title="Total sulfur dioxide vs. free sulfur dioxide"
+  )
+```
+
+## Sulphates vs. Total Sulfur Dioxide
+
+Let's verify to which extent the variable description holds true and
+how much sulfates really contribute to 'unpleasant' SO2 levels.
+Calculating the $r$, we find just $r = 0.1345$ and $r^2 = 0.0181$, 
+showing that variability of the sulphate only describes 1.8% percent
+of the variability in the sulfur dioxide level and therefore is not
+a very good indicator for total sulfur dioxide level. The 
+corellation for free sulfur dioxide is even lower
+($r_\text{free} = 0.0592$).
+
+```{r sulphates vs. total sulfur dioxide, warning=FALSE, echo=FALSE}
+cat("Corellation sulphates vs. total sulfur dioxide:", 
+    cor(wine$sulphates, wine$total.sulfur.dioxide))
+cat("R^2 value sulphates vs. total sulfur dioxide:", 
+    cor(wine$sulphates, wine$total.sulfur.dioxide)^2)
+cat("Corellation sulphates vs. free sulfur dioxide:", 
+    cor(wine$sulphates, wine$free.sulfur.dioxide))
+
+ggplot_corr(
+    data=wine, x="sulphates", y="total.sulfur.dioxide", 
+    xscale=c(0.2, 1.000, 0.05), yscale=c(0, 300, 20),
+    xlab="Sulphates in the wine in g/dm³",
+    ylab="Total sulfur dioxide in mg/dm³",
+    title="Sulphates vs. total sulfur dioxide"
+  )
+```
+
+## Residual Sugar vs. Alcohol
+
+Gestation creates alcohol from sugar, therefore, with more alcohol in the wine,
+we expect less sugar; indeed, the values are negatively corellated
+($r = -0.4506$). The graph below shows that indeed, a higher residual sugar
+content leads to less alcohol, but we also note, that the spread of the
+alcohol content is much higher for wines with lower sugar content,
+suggesting perhaps, that some wines may have not enough sugar to turn into
+alcohol to begin with. 
+
+```{r residual sugar vs. alcohol, echo=FALSE, warning=FALSE, error=FALSE}
+cat("Corellation between residual sugar and alcohol content: ",
+    cor(wine$residual.sugar, wine$alcohol))
+
+ggplot_corr(
+    data=wine, x="residual.sugar", y="alcohol", 
+    xscale=c(0, 32, 2), yscale=c(8, 14, 0.5),
+    xlab="Residual sugar in g/dm³", 
+    ylab="Alcohol level in % by volume",
+    title="Residual sugar vs. alcohol level"
+  )
+```
+
+## Density vs. Sugar & Alcohol Level
 
 Verifying the statement of the variable description about the density to be 
 influenced by residual sugar and alcohol content, we analyze the
@@ -647,8 +707,10 @@ explained by the variabilit in alcohol; since these two variables are highly
 coreallated, we could not use them both in a linear model explaining the
 density variable.
 
-```{r density vs. residual sugar vs. alcohol, warning=F, fig.width=15, fig.height=10}
+```{r density vs. residual sugar vs. alcohol, warning=F, fig.width=15, fig.height=10, error=FALSE, echo=FALSE}
+cat("Corellation wine density vs. ...")
 cor(wine$density, wine[, c("residual.sugar", "alcohol")])
+cat("R^2 value vs. ...")
 cor(wine$density, wine[, c("residual.sugar", "alcohol")])^2
 
 p1 <- ggplot_corr(
@@ -660,7 +722,7 @@ p1 <- ggplot_corr(
   )
 p2 <- ggplot_corr(
     data=wine, x="residual.sugar", y="density", 
-    xscale=c(0, 45, 2), yscale=c(0.985, 1.005, 0.005),
+    xscale=c(0, 32, 2), yscale=c(0.985, 1.005, 0.005),
     xlab="Residual sugar in g/dm³",
     ylab="Density in g/cm³",
     title="Residual Sugar vs. Density"
@@ -669,27 +731,7 @@ p2 <- ggplot_corr(
 grid.arrange(p1, p2, nrow=1)
 ```
 
-## Output Variable: Quality based on Sensory Data (0-10)
-
-The following graph shows the overall distribution of the score that
-was given to the wines. It ranges from 3 to 9, with 20 wines being
-in the worst category (3), 5 in the best (9) and most wines (2198)
-scoring a "6" slightly above average (5.86) and the mid-point value
-that could be avarded (5), potentially showing a psychological 
-bias of the wine testers to slightly overscore wines.
-
-```{r quality}
-summary(wine$quality)
-table(wine$quality)
-ggplot_hist(
-     data=wine, x="quality", binwidth=1, xscale=c(0, 10, 1),
-     title="Quality Score ",
-     xlab="Quality Score (0-10)",
-     ylab="Number of Wines having that Quality"
-  )
-```
-
-## Categorical Variable: Wine Flavor
+# Introducing a Categorical Variable: Wine Flavor
 
 We create the following categorical variable to classify wines according
 to their flavor based on existing EU regulations:
@@ -702,9 +744,6 @@ should be not less than 2 g/l below sugar content
 acidity should be not less than 10 g/l below sugar content
 * wines with max. 45 g/l residual sugar content are considered 'semi-sweet'
 * wines above 45 g/l residual sugar content are considered 'sweet'
-
-There are many (classical-)dry wines, less sweet wines, only a few semi-sweet
-wine and only one single sweet wine.
 
 ```{r flavor definition}
 # Create categorical variable for "wine flavor" according to EU trade 
@@ -720,9 +759,14 @@ wine$flavor <-
       ifelse(wine$residual.sugar > 45, "sweet",
       "unclassified"
       )))))
+```
 
+There are many (classical-)dry wines, less sweet wines, only a few semi-sweet
+wine and only one single sweet wine.
 
+```{r flavor distribution, echo=FALSE}
 # Show how many wines have each flavor
+cat("Distribution of wine flavors:")
 table(wine$flavor)
 ```
 
@@ -732,7 +776,7 @@ a slight "diagonal slope" at each cut-off-point between clusters signifying one
 particular flavor type. These are due to the restrictions put on the acidity
 level.
 
-```{r flavor scatterplot}
+```{r flavor scatterplot, echo=FALSE}
 # Plot relationship of wine flavor depending on acidity and residual sugar
 ggplot(data=wine, aes(x=residual.sugar, y=acidity, colour=flavor)) +  
   geom_jitter(alpha=0.5) + 
@@ -740,7 +784,7 @@ ggplot(data=wine, aes(x=residual.sugar, y=acidity, colour=flavor)) +
   ggtitle("Classification of wines according to EU law") +
   scale_x_continuous(limits=c(0, 66), breaks = seq(0, 66, 5)) + 
   scale_y_continuous(limits=c(3.5, 15), breaks=seq(3.5, 15, 0.5)) + 
-  scale_colour_discrete(name="Flavor")
+  scale_color_brewer(name="Flavor", type="qual", palette=6)
 ```
 
 Finally, we show the sugar content distribution of each wine flavor as a 
@@ -749,15 +793,18 @@ histogram are due to treating all the wines in "one bucket". Within
 the sugar content distribution of their wine flavor, the distributions
 are much more uniform.
 
-```{r flavor histogram}
+```{r flavor histogram, echo=FALSE}
 ggplot_hist(
-     data=wine, x="residual.sugar", binwidth=0.2, xscale=c(0, 45, 2),
+     data=wine, x="residual.sugar", binwidth=0.2, xscale=c(0, 32, 2),
      fill="flavor", fillname="Wine Flavor",
      title="Distribution of residual sugar (non-sweet wines)",
      xlab="Residual sugar in g/dm³",
      ylab="Number of wines with this residual sugar content"
-  )
+  ) +
+  scale_fill_brewer(name="Flavor", type="qual", palette=6)
 ```
+
+# Multivariate Analysis
 
 ## Scatterplot Matrix
 
@@ -768,26 +815,41 @@ triangle, using a scatterplot for numerical data
 * rows/columns that involves a categorical variable showing facetted plots
 * distributions of single variables along the diagonale
 
-```{r scatterplot matrix, fig.width=15, fig.height=20, warning=FALSE, message=FALSE}
+```{r scatterplot matrix, fig.width=15, fig.height=20, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
 set.seed(1836)
-winematrix <- wine[, c(2:15)]
-ggpairs(data=winematrix[sample.int(nrow(winematrix), 1000), ],
+ggpairs(data=wine[sample.int(nrow(wine), 1000), c(2:14)],
         title="Relationship between any two variables",
         alpha=0.05)
 ```
+
+The following corellation table also shows the corellation values between
+any two variables again and highlights visually highest and lowest
+corellation values:
+
+```{r corellation table, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE, fig.width=10, fig.height=7}
+# plot a corellation table with all the numerical values and use the 
+# gradient we defined above
+ggcorr(data=wine[sample.int(nrow(wine), 1000), c(2:14)], name="r",
+       label=TRUE, hjust=1, angle=-45, size=3, label_round=2) + 
+  cor_fill_gradient + 
+  ggtitle("Corellation table for any two variables")
+```
+
 
 ### Confirmation of previous findings (little surprises)
 
 First, we can-re-confirm our previous findings.
 
-```{r r for acidity vs. all types of acidity}
+```{r r for acidity vs. all types of acidity, echo=FALSE, echo=FALSE}
+cat("Corellation of acidity with...:")
 cor(wine$acidity, wine[, c("fixed.acidity", "volatile.acidity", "citric.acid")])
 ```
 **Negative corellation**; acidity is defined as the sum-of-weight of all acids;
 with fixed acids and citrics acids usually dominating over volatile acids, the
 corellation here is stronger.
 
-```{r r for pH vs. all types of acidity}
+```{r r for pH vs. all types of acidity, echo=FALSE}
+cat("Corellation of pH with...:")
 cor(wine$pH, wine[, c("acidity", "fixed.acidity",
                       "volatile.acidity", "citric.acid")])
 ```
@@ -797,64 +859,74 @@ take basic chemical components into account. Thus, also corellation between
 pH and any specific type of acidity is lower than corellation between the
 variable acidity and the corresponding type of acidity.
 
-```{r r for total.sulfur.dioxide vs. free.sulfur.dioxide}
+```{r r for total.sulfur.dioxide vs. free.sulfur.dioxide, echo=FALSE}
+cat("Corellation of total sulfur dioxide with free sulfur dioxide:")
 cor(wine$total.sulfur.dioxide, wine$free.sulfur.dioxide)
 ```
 **Strong positive corellation** because free sulfur dioxide makes out the
 majority of all sulfur dioxides.
 
-```{r r for sulphates vs. total.sulfur.dioxide}
-cor(wine$sulphates, wine$total.sulfur.dioxide)
+```{r r for sulphates vs. total.sulfur.dioxide, echo=FALSE}
+cat("Corellation of sulphates with total sulfur dioxide:", 
+    cor(wine$sulphates, wine$total.sulfur.dioxide))
 ```
 **Weak positive corellation**, as the description of sulphates suggests,
 sulphates lead to the creation of SO2 levels.
 
-```{r r for alcohol vs. residual.sugar}
-cor(wine$alcohol, wine$residual.sugar)
+```{r r for alcohol vs. residual.sugar, echo=FALSE}
+cat("Corellation of alcohol content with residual sugar:", 
+    cor(wine$alcohol, wine$residual.sugar))
 ```
 **Strong negative corellation** because of chemical process of alcohol
 gestation (sugar is converted to alcohol).
 
-```{r r for residual.sugar vs. alcohol}
-cor(wine$residual.sugar, wine$density)
+```{r r for residual.sugar vs. alcohol, echo=FALSE}
+cat("Corellation of alcohol content with residual sugar:", 
+    cor(wine$residual.sugar, wine$density))
 ```
 **Strong positive corellation**, additional sugar in the fluid leads to a
 higher density than no sugar.
 
-```{r r for free.sulfur.dioxide vs. total.sulfur.dioxide}
-cor(wine$free.sulfur.dioxide, wine$total.sulfur.dioxide)
+```{r r for free.sulfur.dioxide vs. total.sulfur.dioxide, echo=FALSE}
+cat("Corellation of free sulfur dioxide with total sulfur dioxide:", 
+    cor(wine$free.sulfur.dioxide, wine$total.sulfur.dioxide))
 ```
 **Strong positive corellation**, because free sulfur dioxide is the major
 part of total sulfur dioxide.
 
 ### New Findings Concerning Chemical Properties
 
-```{r r for residual.sugar vs. free.sulfur.dioxide}
-cor(wine$residual.sugar, wine$free.sulfur.dioxide)
+```{r r for residual.sugar vs. free.sulfur.dioxide, echo=FALSE}
+cat("Corellation of residual sugar with free sulfur dioxide:", 
+    cor(wine$residual.sugar, wine$free.sulfur.dioxide))
 ```
 **Weak positive corellation** -- Free sulfur dioxide 'prevents microbial
 growth', therefore might constrain alcohol gestation and result in
 more remaining residual sugar.
 
-```{r r for chlorides vs. alcohol}
-cor(wine$chlorides, wine$alcohol)
+```{r r for chlorides vs. alcohol, echo=FALSE}
+cat("Corellation of chlorides with alcohol content:", 
+    cor(wine$chlorides, wine$alcohol))
 ```
 **Weak negative corellation** -- 'saltier' wines seem to contain less
 alcohol. Does the salt also inhibit the gestation process?
 
-```{r r for chlorides and total.sulfur.dioxide vs. density}
+```{r r for chlorides and total.sulfur.dioxide vs. density, echo=FALSE}
+cat("Corellation of density with ...:")
 cor(wine$density, wine[, c("chlorides", "total.sulfur.dioxide")])
 ```
 **Positive corellation**, higher for "total.sulfur.dioxide", both 
 chlorides and SO2 increase the density of the wine.
 
-```{r r for acidity vs. density}
-cor(wine$acidity, wine$density)
+```{r r for acidity vs. density, echo=FALSE}
+cat("Corellation of acidity with density:", 
+    cor(wine$acidity, wine$density))
 ```
 **Weak positive corellation**, acidity further increases the density of wine.
 
-```{r r for alcohol vs. density}
-cor(wine$alcohol, wine$density)
+```{r r for alcohol vs. density, echo=FALSE}
+cat("Corellation of alcohol content with density:", 
+    cor(wine$alcohol, wine$density))
 ```
 **Strong negative corellation**, alcohol content lowers sugar content and leads
 to releases of gases, therefore creating a lighter brew and lowering density.
@@ -864,7 +936,8 @@ to releases of gases, therefore creating a lighter brew and lowering density.
 Inspecting the row/column 'quality' in the scatterplot matrix, we find
 particulary high absolute corellation values for the following variables: 
 
-```{r r for quality}
+```{r r for quality, echo=FALSE}
+cat("Corellation of quality with...:")
 cor(wine$quality, wine[, c("volatile.acidity", "fixed.acidity",
             "chlorides", "alcohol", "total.sulfur.dioxide")])
 ```
@@ -885,11 +958,11 @@ Quality can be seen as a 7-level factor variable (3-9), so we can
 add another discrete (color) dimension to our scatterplot to visualize
 distributions for different levels of quality.
 
-```{r scatterplot matrix by quality, warning=FALSE, fig.width=15, fig.height=20, message=FALSE}
+```{r scatterplot matrix by quality, warning=FALSE, fig.width=15, fig.height=20, message=FALSE, error=FALSE, echo=FALSE}
 set.seed(1836)
-winematrix <- wine[, c(2:15)]
+winematrix <- wine
 winematrix$quality <- as.factor(winematrix$quality)
-ggpairs(data=winematrix[sample.int(nrow(winematrix), 1000), ],
+ggpairs(data=winematrix[sample.int(nrow(winematrix), 1000), c(2:14)],
         title="Relationship focussing on wine quality",
         alpha=0.05, colour="quality")
 ```
@@ -924,8 +997,6 @@ by(wine, wine$flavor,
   )
 ```
 
-# Final Plots and Summaries
-
 ## Corellation between Quality and Chemical Properties by Wine Flavor
 
 The following plot visualizes the interesting finding of the last chapter 
@@ -935,7 +1006,7 @@ influence on wine quality), red signifies negative corellation (negative
 influence on wine quality). Corellations between -0.1 and 0.1 are shown in 
 white as to highlight that they will not be of further investigation.
 
-```{r r for quality by wine - dataframe, warning=FALSE, fig.width=15, fig.height=10}
+```{r r for quality by wine - dataframe, warning=FALSE}
 # here again: corellation of a few highlighted variables with wine quality
 # depending on wine flavour
 winequality <- wine
@@ -950,24 +1021,15 @@ winequality <- winequality %>%
                       cor(quality,fixed.acidity), cor(quality,citric.acid)) %>%
      # give each coreallation their own row in the data frame
      tidyr::gather("indicator", "corellation", 2:8)
+```
 
-# palette with 200 steps over shades of blue
-b <- colorRampPalette(c("lightskyblue","royalblue","navy"))(200)
-# palette with 200 steps over shades of red
-r <- colorRampPalette(c("darkred","red2","mistyrose"))(200)
-# Plot a tile graphe with the different corellation indicators horizontally
+```{r r for quality by wine - graph, warning=FALSE, fig.width=10, fig.height=7, echo=FALSE}
+# Plot a tile graph with the different corellation indicators horizontally
 # and the wine flavors vertically arranged
 ggplot(winequality, aes(x=indicator, y=flavor)) +
   geom_tile(aes(fill=corellation)) +
-  # Background of the tile should be named "Corellation" and reach from
-  # red to white to white to blue mapped to -1.0,..,-0.1,0.1,..,1.0
-  scale_fill_gradientn(name="Corellation", colours=c(r,"white","white",b),
-                       na.value="grey", limits=c(-1,1),
-                       breaks=c(-1.0,-0.5,-0.1,0.1,0.5,1.0),
-                       values=c(
-                           rescale(1:201,to=c(0.0,0.45)),
-                           rescale(1:201,to=c(0.55,1.0))
-                         )) +
+  # use corellation gradient
+  cor_fill_gradient + 
   # label x axis appropriately
   scale_x_discrete(labels=c("Alcohol content", "Residual sugar", "Chlorides",
                             "Volatile acidity", "Total sulfur dioxide", 
@@ -1017,7 +1079,7 @@ height, however gets lower, since less wines are available in the
 sweeter categories. Having that uniformity of distributions assured,
 we can have more confidence in having compareable samples.
 
-```{r chemical composition of different wine flavors, warning=FALSE, fig.width=15, fig.height=10}
+```{r chemical composition of different wine flavors, warning=FALSE, fig.width=15, fig.height=10, echo=FALSE}
 # there is only one "sweet" wine. we will ignore it
 winefilter <- wine %>% dplyr::filter(flavor!="sweet")
 winefilter$quality <- as.factor(winefilter$quality)
@@ -1027,42 +1089,42 @@ winefilter$quality <- as.factor(winefilter$quality)
 p1 <- ggplot_hist(
      data=winefilter, x="alcohol", binwidth=0.1,
      xscale=c(8, 14, 0.5*5),
-     xlab="Alcohol level in % by volume",
+     xlab="Alcohol level (% by volume)",
      ylab="Number of wines with that alcohol level",
      facet=~flavor, nrow=4, ncol=1
   )
 p2 <- ggplot_hist(
      data=winefilter, x="chlorides", binwidth=0.002,
      xscale=c(0, 0.2, 0.01*5),
-     xlab="Chlorides in g/dm³",
+     xlab="Chlorides(g/dm³)",
      ylab="Number of wines with this amount of chlorides",
      facet=~flavor, nrow=4, ncol=1
   )
 p3 <- ggplot_hist(
      data=winefilter, x="total.sulfur.dioxide", binwidth=2,
-     xscale=c(0, 400, 10*5),
-     xlab="Total Sulfur Dioxide in mg/dm³",
+     xscale=c(0, 400, 20*5),
+     xlab="Total sulfur dioxide (mg/dm³)",
      ylab="Number of wines with this amount of total SO2",
      facet=~flavor, nrow=4, ncol=1
   )
 p4 <- ggplot_hist(
      data=winefilter, x="volatile.acidity", binwidth=0.02,
      xscale=c(0, 0.9, 0.05*5),
-     xlab="Volatile acidity (acetic acid) in g/dm³",
+     xlab="Volatile acidity (g/dm³)",
      ylab="Number of wines with this volatile acidity",
      facet=~flavor, nrow=4, ncol=1
   )
 p5 <- ggplot_hist(
     data=winefilter, x="fixed.acidity", binwidth=0.1,
     xscale=c(3.5, 11, 0.5*5),
-    xlab="Fixed acidity (tartaric acid) in g/dm³",
+    xlab="Fixed acidity (g/dm³)",
     ylab="Number of wines with this fixed acidity",
     facet=~flavor, nrow=4, ncol=1
   )
 p6 <- ggplot_hist(
     data=winefilter, x="citric.acid", binwidth=0.02,
     xscale=c(0, 1.4, 0.1*5), 
-    xlab="Cidric acid in g/dm³",
+    xlab="Cidric acid (g/dm³)",
     ylab="Number of wines with this citric acidity",
     facet=~flavor, nrow=4, ncol=1
   )
@@ -1078,15 +1140,11 @@ for each quality score (x-axis) and each flavor (row).
 Added is the 'line of best fit', directly linked to our corellation
 coefficient from the table in the beginning of this chapter.
 
-We observe the following:
-
-* Corellation and linear fit are not everything: for example,
+We that corellation and linear fit are not everything: for example,
 across all flavors, there are some wines, which are ranked very 
 poorly, but have a higher alcohol content than medium-ranked wines
-* 
 
-
-```{r chemical composition of different wine flavors and influence on quality, warning=FALSE, fig.width=15, fig.height=10}
+```{r chemical composition of different wine flavors and influence on quality, warning=FALSE, fig.width=15, fig.height=10, echo=FALSE}
 # now: using boxplots to show the distribution of the 
 # variables about chemical composition for any of the
 # wine qualities
@@ -1139,7 +1197,7 @@ quality scoring combination but instead use color as a visual cue
 to be able to plot all trend lines over each other for each
 chemical property.
 
-```{r chemical composition of different wine flavors and influence on quality 2, warning=FALSE, message=FALSE, fig.width=15, fig.height=10}
+```{r chemical composition of different wine flavors and influence on quality 2, warning=FALSE, message=FALSE, fig.width=15, fig.height=10, echo=FALSE}
 
 # create a summary dataframe
 winesummary <- wine %>%
@@ -1216,8 +1274,8 @@ is actually appreciated in the medium-range of quality scores.
 for some medium-range dry or half-dry wines, a middle level
 of sulfur dioxide is appreciated.
 
-* **Volatile acidity** should not be too low (average wines,
-scores 3-4) and not too high (bad wines, scores 5-7). Half-dry
+* **Volatile acidity** should not be too low (bad wines,
+scores 3-4) and not too high (average wines, scores 5-7). Half-dry
 wines and semi-sweet wines should have no volatile acidity at all.
 
 * The same goes for **Fixed Acidity**, however, here the
@@ -1227,6 +1285,80 @@ differences for (classical-) dry wines is less important.
 a certain low citrus contant scores the wine worse and only
 for a quite high citrus contant, the wine is perceived as
 excellent.
+
+# Final Plots and Summaries
+
+In this paper 4898 wines were compared relating 11 of their chemical
+properties with an expert rating of the wine's quality. The wines were
+grouped into different wine flavors (classical-dry, dry, half-dry, semi-sweet
+and sweet) according to their residual sugar content and 'total' acidity
+(referring to the sum of all types of acidity concentrations: fixed, volatile
+and citric). The below graph shows all the wines combined with their
+classification (color), sugar content (x axis) and acidity (y axis). Notice,
+how generally, the acidity levels are spread out more for dryer wines.
+
+```{r flavor scatterplot, echo=FALSE}
+```
+
+The corellation of different wine properties with each other
+were thoroughly analyzed. Some obvious chemical relations were
+identified, like the negative corellation between sugar content
+and alcohol or the pH value or (positive) corellation between
+pH and any of the acidity values.
+
+However, most interesting is the corellation of the output variable
+"quality" with any of the inputs. The corellation matrix shows, that
+generally, more alcohol ($r = 0.45$), less total sulfur dioxide
+($r = -0.19$), less salt ($r = -0.19$) and less volatile acidity
+($r = -0.18$) leads to better wines.
+
+```{r corellation table, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE, fig.width=10, fig.height=7}
+```
+
+Factoring in domain knowledge about different wine flavors and,
+conversely, different expectations on each flavor, we furthermore
+come to the conclusion, that some of the properties are more
+important for some wine flavors and less important for others.
+
+As described in the graph below, chlorides have a larger negative influence
+the more sweeter the wine
+($r_\text{semi-sweet}(\text{chlorides},\text{quality})=-0.297$),
+volatile acidity seems to have a particular bad impact on half-dry wines
+($r_\text{half-dry}(\text{volatile.acidity},\text{quality})=-0.307$)
+and total sulfur dioxide seems to decrease the quality of dry wines most
+($r_\text{dry}(\text{total.sulfur.dioxide},\text{quality})=-0.26$).
+Alcohol content, on the other hand, has the strongest positive impact
+for the driest wines
+($r_\text{classical-dry}(\text{alcohol},\text{quality})=0.458$,
+$r_\text{semi-sweet}(\text{alcohol},\text{quality})=0.16$).
+
+```{r r for quality by wine - graph, warning=FALSE, fig.width=10, fig.height=7, echo=FALSE}
+```
+
+However, (linear) corellation values are not everything:
+looking at the mean (and standard-error) of each wine
+flavor scored with a particulary score, we can definetely
+see some surprising non-linear trends for some of the
+chemical properties. See belows graph. 
+
+The most surprising finding here is that for some of the
+chemical properties, there seems to be an actual "sweet
+spot" - more of an ideal value of said distribution than
+an actual linear trend. This applies to:
+
+* salt content for all wines except half-dry wines
+* sulfur dioxide for some medium-range dry or half-dry wines
+* volatile acidity for all (classical)-dry wines: should not
+be too low (bad wines scored 3-4) and not too high (average
+wines scored 5-7).
+
+In addition to that, citric acidity seems to follow an 'uncanny
+valeys' where a certain low citrus contant scores the wine
+worse and only for a quite high citrus contant, the wine
+is perceived as excellent.
+
+```{r chemical composition of different wine flavors and influence on quality 2, warning=FALSE, message=FALSE, fig.width=15, fig.height=10, echo=FALSE}
+```
 
 # Reflection
 
