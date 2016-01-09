@@ -175,6 +175,15 @@ cor_fill_gradient <- scale_fill_gradientn(name="Corellation",
                            rescale(1:201,to=c(0.55,1.0))
                          ))
 
+# Function to add row to data frame at a specific point
+insert_row_to_dataframe <- function(dataframe, newrow, rowindex) {
+  dataframe <- rbind(dataframe, newrow)
+  dataframe <- dataframe[order(c(1:(nrow(dataframe)-1),r-0.5)),]
+  row.names(dataframe) <- 1:nrow(dataframe)
+  return(dataframe)
+}
+
+
 # There is an issue with my version of ggcorr not displaying the corellation 
 # values continuously: somehow it does not set the parameter "nbreaks"
 # correctly. The following pulls the most up-to-date version from GitHub
@@ -592,28 +601,28 @@ cor(wine[, c("fixed.acidity", "volatile.acidity", "citric.acid", "acidity")],
 
 p1 <- ggplot_corr(
     data=wine, x="fixed.acidity", y="pH",
-    xscale=c(3.5, 11, 0.5), yscale=c(2.6, 4.0, 0.4),
+    xscale=c(3.5, 11, 1), yscale=c(2.6, 4.0, 0.4),
     xlab="Fixed acidity (tartaric acid) in g/l",
     ylab="pH",
     title="Fixed acidity vs. pH"
   )
 p2 <- ggplot_corr(
     data=wine, x="volatile.acidity", y="pH", 
-    xscale=c(0, 0.9, 0.05), yscale=c(2.6, 4.0, 0.4),
+    xscale=c(0, 0.9, 0.1), yscale=c(2.6, 4.0, 0.4),
     xlab="Volatile acidity (acetic acid) in g/l",
     ylab="pH",
     title="Volatile acidity vs. pH"
   )
 p3 <- ggplot_corr(
     data=wine, x="citric.acid", y="pH", 
-    xscale=c(0, 1.4, 0.1), yscale=c(2.6, 4.0, 0.4),
+    xscale=c(0, 1.4, 0.2), yscale=c(2.6, 4.0, 0.4),
     xlab="Citric acidity in g/l",
     ylab="pH",
     title="Citric acidity vs. pH"
   )
 p4 <- ggplot_corr(
     data=wine, x="acidity", y="pH", 
-    xscale=c(3.5, 12, 0.5), yscale=c(2.6, 4.0, 0.4),
+    xscale=c(3.5, 12, 1), yscale=c(2.6, 4.0, 0.4),
     xlab="Sum of acid concentrations in g/l",
     ylab="pH",
     title="'Total' acidity vs. citric acidity"
@@ -1001,7 +1010,10 @@ by(wine, wine$flavor,
 
 The following plot visualizes the interesting finding of the last chapter 
 graphically: depending on wine flavor, different chemical qualities
-play a higher or lower role. Blue signifies positive corellation (positive
+play a higher or lower role. The first line ("any (summary)" shows the 
+general corellation again, as was displayed in the previous plot.
+
+Blue signifies positive corellation (positive
 influence on wine quality), red signifies negative corellation (negative
 influence on wine quality). Corellations between -0.1 and 0.1 are shown in 
 white as to highlight that they will not be of further investigation.
@@ -1009,18 +1021,33 @@ white as to highlight that they will not be of further investigation.
 ```{r r for quality by wine - dataframe, warning=FALSE}
 # here again: corellation of a few highlighted variables with wine quality
 # depending on wine flavour
-winequality <- wine
+winequality_pre <- wine
 # "quality" needs to be a numeric in order to asess corellation
-winequality$quality <- as.numeric(as.character(winequality$quality))
-winequality <- winequality %>%
-     # group by flavour and calculate a bunch of corellations
-     dplyr::group_by(flavor) %>%
-     dplyr::summarise(cor(quality,alcohol), cor(quality,residual.sugar),
-                      cor(quality,chlorides), cor(quality,volatile.acidity), 
-                      cor(quality,total.sulfur.dioxide),
-                      cor(quality,fixed.acidity), cor(quality,citric.acid)) %>%
-     # give each coreallation their own row in the data frame
-     tidyr::gather("indicator", "corellation", 2:8)
+winequality_pre$quality <- as.numeric(as.character(winequality_pre$quality))
+winequality_by_flavor <- winequality_pre %>%
+    # group by flavour and calculate a bunch of corellations
+    dplyr::group_by(flavor) %>%
+    dplyr::summarise(cor(quality,alcohol), cor(quality,residual.sugar),
+                    cor(quality,chlorides), cor(quality,volatile.acidity), 
+                    cor(quality,total.sulfur.dioxide),
+                    cor(quality,fixed.acidity), cor(quality,citric.acid)) %>%
+    # give each coreallation their own row in the data frame
+    tidyr::gather("indicator", "corellation", 2:8)
+winequality_all_flavors <- winequality_pre %>%
+    # calculate a summary row
+    dplyr::summarise(cor(quality,alcohol), cor(quality,residual.sugar),
+                    cor(quality,chlorides), cor(quality,volatile.acidity), 
+                    cor(quality,total.sulfur.dioxide),
+                    cor(quality,fixed.acidity), cor(quality,citric.acid)) %>%
+    dplyr::mutate(flavor="any (summary)") %>%
+    # give each coreallation their own row in the data frame
+    tidyr::gather("indicator", "corellation", 1:7)
+winequality <-
+    # join summary row (on top) with flavor specific row (on bottom)
+    dplyr::union(winequality_all_flavors, winequality_by_flavor) 
+# re-order factor for display ("summary" should be on top)
+winequality$flavor <- factor(winequality$flavor,
+    c("classical-dry", "dry", "half-dry", "semi-sweet", "sweet", "any (summary)"))
 ```
 
 ```{r r for quality by wine - graph, warning=FALSE, fig.width=10, fig.height=7, echo=FALSE}
@@ -1306,28 +1333,30 @@ identified, like the negative corellation between sugar content
 and alcohol or the pH value or (positive) corellation between
 pH and any of the acidity values.
 
-However, most interesting is the corellation of the output variable
-"quality" with any of the inputs. The corellation matrix shows, that
-generally, more alcohol ($r = 0.45$), less total sulfur dioxide
-($r = -0.19$), less salt ($r = -0.19$) and less volatile acidity
-($r = -0.18$) leads to better wines.
+However, the corellations of different chemical properties with
+wine quality are most interesting. The following plot shows 
+corellation of some of those properties with wine quality in the
+fist line as well as a break-down of those corellation 
+by wine flavor in the remaining lines.
 
-```{r corellation table, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE, fig.width=10, fig.height=7}
-```
+We see that most influential for good quality are alcohol content
+($r(\text{alcohol},\text{quality}) = 0.45$), and that bad wine 
+quality is mostly due high total sulfur dioxide levels
+($r(\text{total.sulfur.dioxide},\text{quality}) = -0.19$),
+salt levels ($r(\text{chlorides},\text{quality}) = -0.19$)
+and volatile acidity levels
+($r(\text{volatile.acidity},\text{quality}) = -0.18$).
 
-Factoring in domain knowledge about different wine flavors and,
-conversely, different expectations on each flavor, we furthermore
-come to the conclusion, that some of the properties are more
-important for some wine flavors and less important for others.
+Taking into consideration the break-down by flavor, we find:
 
-As described in the graph below, chlorides have a larger negative influence
+* Chlorides have a larger negative influence
 the more sweeter the wine
-($r_\text{semi-sweet}(\text{chlorides},\text{quality})=-0.297$),
-volatile acidity seems to have a particular bad impact on half-dry wines
+($r_\text{semi-sweet}(\text{chlorides},\text{quality})=-0.297$)
+* Volatile acidity seems to have a particular bad impact on half-dry wines
 ($r_\text{half-dry}(\text{volatile.acidity},\text{quality})=-0.307$)
-and total sulfur dioxide seems to decrease the quality of dry wines most
-($r_\text{dry}(\text{total.sulfur.dioxide},\text{quality})=-0.26$).
-Alcohol content, on the other hand, has the strongest positive impact
+* Total sulfur dioxide seems to decrease the quality of dry wines most
+($r_\text{dry}(\text{total.sulfur.dioxide},\text{quality})=-0.26$)
+* Alcohol content has the strongest positive impact
 for the driest wines
 ($r_\text{classical-dry}(\text{alcohol},\text{quality})=0.458$,
 $r_\text{semi-sweet}(\text{alcohol},\text{quality})=0.16$).
